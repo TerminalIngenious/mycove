@@ -223,7 +223,7 @@ export default function DashboardScreen() {
         <div className="mb-8">
           {/* ✅ FIX 1 : Prénom dynamique */}
           <h1 className="text-[32px] font-bold text-[#F8FAFC] mb-2">
-            Salut {userName} 👋
+            Salut {userName} 
           </h1>
           {/* ✅ Date dynamique */}
           <p className="text-base text-[#94A3B8]">
