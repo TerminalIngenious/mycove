@@ -35,7 +35,9 @@ export default function DashboardScreen() {
   const [menuPlusOpen, setMenuPlusOpen] = useState(false);
   const [moodValue, setMoodValue] = useState(7);
   const [savedMood, setSavedMood] = useState<number | null>(null);
+  // ✅ FIX 1 : userId récupéré depuis Supabase auth, plus hardcodé
   const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("toi");
 
   const [tasks, setTasks] = useState<Task[]>([
     {
@@ -68,17 +70,39 @@ export default function DashboardScreen() {
     },
   ]);
 
-  // Récupérer l'utilisateur connecté
+  // ✅ FIX 1 : Récupérer le vrai utilisateur connecté via Supabase
   useEffect(() => {
-    // USER ID TEMPORAIRE POUR TEST
-    const testUserId = "COLLE_L_UUID_ICI";
-    setUserId(testUserId);
-    loadTodayMood(testUserId);
-  }, []);
+    const fetchUser = async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        // Pas connecté → rediriger vers login
+        router.push("/login");
+        return;
+      }
+
+      setUserId(user.id);
+
+      // Récupérer le prénom depuis les métadonnées ou le profil
+      const prenom =
+        user.user_metadata?.prenom ||
+        user.user_metadata?.first_name ||
+        user.email?.split("@")[0] ||
+        "toi";
+      setUserName(prenom);
+
+      loadTodayMood(user.id);
+    };
+
+    fetchUser();
+  }, [router]);
 
   // Charger l'humeur du jour
   const loadTodayMood = async (uid: string) => {
-    const today = new Date().toISOString().split("T")[0]; // Format: 2026-03-20
+    const today = new Date().toISOString().split("T")[0];
 
     const { data, error } = await supabase
       .from("moods")
@@ -101,8 +125,8 @@ export default function DashboardScreen() {
   const toggleTask = (taskId: string) => {
     setTasks(
       tasks.map((task) =>
-        task.id === taskId ? { ...task, done: !task.done } : task,
-      ),
+        task.id === taskId ? { ...task, done: !task.done } : task
+      )
     );
   };
 
@@ -114,7 +138,6 @@ export default function DashboardScreen() {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // Vérifier si une humeur existe déjà aujourd'hui
     const { data: existing } = await supabase
       .from("moods")
       .select("*")
@@ -123,7 +146,6 @@ export default function DashboardScreen() {
       .single();
 
     if (existing) {
-      // Update
       const { error } = await supabase
         .from("moods")
         .update({ mood_value: moodValue })
@@ -134,7 +156,6 @@ export default function DashboardScreen() {
         return;
       }
     } else {
-      // Insert
       const { error } = await supabase.from("moods").insert({
         user_id: userId,
         mood_value: moodValue,
@@ -147,11 +168,37 @@ export default function DashboardScreen() {
       }
     }
 
-    console.log("Humeur sauvegardée:", moodValue);
     setSavedMood(moodValue);
-
-    // Feedback visuel
     setTimeout(() => setSavedMood(null), 2000);
+  };
+
+  // ✅ Date du jour affichée dynamiquement
+  const formatTodayLabel = () => {
+    const now = new Date();
+    const days = [
+      "Dimanche",
+      "Lundi",
+      "Mardi",
+      "Mercredi",
+      "Jeudi",
+      "Vendredi",
+      "Samedi",
+    ];
+    const months = [
+      "Janvier",
+      "Février",
+      "Mars",
+      "Avril",
+      "Mai",
+      "Juin",
+      "Juillet",
+      "Août",
+      "Septembre",
+      "Octobre",
+      "Novembre",
+      "Décembre",
+    ];
+    return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]}`;
   };
 
   const moodEmojis = [
@@ -174,11 +221,13 @@ export default function DashboardScreen() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* HEADER */}
         <div className="mb-8">
+          {/* ✅ FIX 1 : Prénom dynamique */}
           <h1 className="text-[32px] font-bold text-[#F8FAFC] mb-2">
-            Salut Mattéo 👋
+            Salut {userName} 👋
           </h1>
+          {/* ✅ Date dynamique */}
           <p className="text-base text-[#94A3B8]">
-            Vendredi 20 Mars • Voici ton résumé
+            {formatTodayLabel()} • Voici ton résumé
           </p>
         </div>
 
@@ -209,7 +258,6 @@ export default function DashboardScreen() {
                 />
               </div>
 
-              {/* BOUTON ENREGISTRER */}
               <button
                 onClick={handleSaveMood}
                 disabled={!userId}
@@ -493,9 +541,7 @@ export default function DashboardScreen() {
                         <p className="text-sm font-medium text-[#F8FAFC]">
                           {activity.title}
                         </p>
-                        <p className="text-xs text-[#64748B]">
-                          {activity.lieu}
-                        </p>
+                        <p className="text-xs text-[#64748B]">{activity.lieu}</p>
                       </div>
                     </div>
                   );

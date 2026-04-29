@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Calendar } from 'lucide-react';
+import { X } from 'lucide-react';
 import { supabase } from '@/src/lib/supabase';
 
 interface ModalNouvelleDepenseProps {
@@ -23,37 +23,23 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Nourriture');
-  const [date, setDate] = useState('Aujourd\'hui');
+  // ✅ FIX 4 : Date par défaut = aujourd'hui en ISO (YYYY-MM-DD), pas le string "Aujourd'hui"
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<'depense' | 'revenu'>('depense');
   const [loading, setLoading] = useState(false);
 
-  // Catégories selon le type
   const categoriesDepense = [
-    'Nourriture',
-    'Transport',
-    'Sorties',
-    'Études',
-    'Logement',
-    'Shopping',
-    'Santé',
-    'Abonnements',
-    'Autre'
+    'Nourriture', 'Transport', 'Sorties', 'Études',
+    'Logement', 'Shopping', 'Santé', 'Abonnements', 'Autre',
   ];
 
   const categoriesRevenu = [
-    'Travail',
-    'Freelance',
-    'Bourse',
-    'Famille',
-    'Vente',
-    'Investissement',
-    'Allocation',
-    'Autre'
+    'Travail', 'Freelance', 'Bourse', 'Famille',
+    'Vente', 'Investissement', 'Allocation', 'Autre',
   ];
 
   const categories = type === 'depense' ? categoriesDepense : categoriesRevenu;
 
-  // Mettre à jour la catégorie quand on change de type
   const handleTypeChange = (newType: 'depense' | 'revenu') => {
     setType(newType);
     setCategory(newType === 'depense' ? 'Nourriture' : 'Travail');
@@ -65,16 +51,14 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
     setLoading(true);
 
     try {
-      // Récupérer l'utilisateur connecté
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         console.error('User not logged in');
         setLoading(false);
         return;
       }
 
-      // Insérer la dépense/revenu dans Supabase
       const { data, error } = await supabase
         .from('expenses')
         .insert({
@@ -82,6 +66,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
           amount: parseFloat(amount),
           description: description,
           category: category,
+          // ✅ FIX 4 : date est maintenant un vrai ISO string YYYY-MM-DD
           date: date,
           type: type,
         })
@@ -96,7 +81,6 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
 
       console.log('Dépense/Revenu créé:', data);
 
-      // Callback optionnel
       if (onSubmit) {
         onSubmit({
           amount: parseFloat(amount),
@@ -111,9 +95,9 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
       setAmount('');
       setDescription('');
       setCategory('Nourriture');
-      setDate('Aujourd\'hui');
+      setDate(new Date().toISOString().split('T')[0]);
       setType('depense');
-      
+
       setLoading(false);
       onClose();
     } catch (err) {
@@ -127,7 +111,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
   return (
     <>
       {/* Overlay */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -140,7 +124,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
             <div className="w-10 h-1 bg-[#334155] rounded-full" />
           </div>
 
-          {/* Header - Titre dynamique */}
+          {/* Header */}
           <div className="flex items-center justify-between pb-6">
             <h3 className="text-xl font-bold text-[#F8FAFC]">
               {type === 'depense' ? 'Nouvelle dépense' : 'Nouveau revenu'}
@@ -155,11 +139,9 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
 
           {/* Form */}
           <div className="pb-8 space-y-4">
-            {/* Type - EN PREMIER */}
+            {/* Type */}
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Type
-              </label>
+              <label className="block text-sm font-medium text-[#94A3B8] mb-2">Type</label>
               <div className="flex rounded-xl overflow-hidden border border-[#334155]">
                 <button
                   onClick={() => handleTypeChange('depense')}
@@ -186,9 +168,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
 
             {/* Montant */}
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Montant
-              </label>
+              <label className="block text-sm font-medium text-[#94A3B8] mb-2">Montant</label>
               <div className="relative">
                 <input
                   type="number"
@@ -206,9 +186,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-[#94A3B8] mb-2">Description</label>
               <input
                 type="text"
                 placeholder={type === 'depense' ? 'Ex: Courses Carrefour' : 'Ex: Mission Malt'}
@@ -218,7 +196,7 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
               />
             </div>
 
-            {/* Catégorie / Source - Label dynamique */}
+            {/* Catégorie */}
             <div>
               <label className="block text-sm font-medium text-[#94A3B8] mb-2">
                 {type === 'depense' ? 'Catégorie' : 'Source'}
@@ -241,29 +219,25 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
               </div>
             </div>
 
-            {/* Date */}
+            {/* ✅ FIX 4 : Date — input type="date" natif pour un vrai ISO */}
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-2">
-                Date
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full h-12 px-4 pr-12 bg-[#0F172A] border border-[#334155] rounded-xl text-sm text-[#F8FAFC] focus:border-[#22D3EE] focus:outline-none transition-colors"
-                />
-                <Calendar size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#64748B]" />
-              </div>
+              <label className="block text-sm font-medium text-[#94A3B8] mb-2">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className="w-full h-12 px-4 bg-[#0F172A] border border-[#334155] rounded-xl text-sm text-[#F8FAFC] focus:border-[#22D3EE] focus:outline-none transition-colors cursor-pointer [color-scheme:dark]"
+              />
             </div>
 
-            {/* Bouton Ajouter */}
+            {/* Submit */}
             <button
               onClick={handleSubmit}
-              disabled={!amount || parseFloat(amount) <= 0 || !description.trim() || loading}
-              className="w-full h-12 rounded-xl bg-[#22D3EE] text-[#0F172A] text-base font-semibold hover:bg-[#1DB8D1] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              disabled={loading || !amount || !description.trim()}
+              className="w-full h-12 rounded-xl bg-[#22D3EE] text-[#0F172A] text-sm font-semibold transition-all hover:bg-[#1DB8D1] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Ajout en cours...' : 'Ajouter'}
+              {loading ? 'Enregistrement...' : type === 'depense' ? 'Ajouter la dépense' : 'Ajouter le revenu'}
             </button>
           </div>
         </div>
@@ -271,12 +245,8 @@ export function ModalNouvelleDepense({ isOpen, onClose, onSubmit }: ModalNouvell
 
       <style jsx>{`
         @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
         }
         .animate-slide-up {
           animation: slide-up 0.3s ease-out;

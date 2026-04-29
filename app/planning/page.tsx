@@ -17,6 +17,8 @@ interface Task {
   time: string;
   priority: string;
   done: boolean;
+  // ✅ FIX 2 : les tâches ont une date en BDD
+  date?: string;
 }
 
 export default function PlanningScreen() {
@@ -33,24 +35,30 @@ export default function PlanningScreen() {
     router.push(`/${nav}`);
   };
 
-  // Charger les tâches depuis Supabase
-  const loadTasks = async () => {
+  // ✅ FIX 2 : Formater la date sélectionnée en ISO pour le filtre
+  const getDateISO = (date: Date) => date.toISOString().split('T')[0];
+
+  // ✅ FIX 2 : Charger les tâches filtrées par la date sélectionnée
+  const loadTasks = async (forDate: Date) => {
     setLoading(true);
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
-        console.error('User not logged in');
-        setLoading(false);
+        router.push('/login');
         return;
       }
+
+      const dateISO = getDateISO(forDate);
 
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        // ✅ FIX 2 : Filtrer par date — nécessite une colonne "date" (YYYY-MM-DD) dans ta table tasks
+        .eq('date', dateISO)
+        .order('time', { ascending: true });
 
       if (error) {
         console.error('Error loading tasks:', error);
@@ -58,22 +66,22 @@ export default function PlanningScreen() {
         return;
       }
 
-      console.log('Tâches chargées:', data);
       setTasks(data || []);
       setLoading(false);
-      
+
     } catch (err) {
       console.error('Unexpected error:', err);
       setLoading(false);
     }
   };
 
+  // Recharger quand la date change
   useEffect(() => {
-    loadTasks();
-  }, []);
+    loadTasks(currentDate);
+  }, [currentDate]);
 
   const handleTaskAdded = () => {
-    loadTasks();
+    loadTasks(currentDate);
   };
 
   // Toggle done/undone
@@ -81,7 +89,8 @@ export default function PlanningScreen() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    setTasks(tasks.map(t => 
+    // Optimiste
+    setTasks(tasks.map(t =>
       t.id === taskId ? { ...t, done: !t.done } : t
     ));
 
@@ -92,7 +101,8 @@ export default function PlanningScreen() {
 
     if (error) {
       console.error('Error updating task:', error);
-      setTasks(tasks.map(t => 
+      // Rollback
+      setTasks(tasks.map(t =>
         t.id === taskId ? { ...t, done: task.done } : t
       ));
     }
@@ -102,7 +112,6 @@ export default function PlanningScreen() {
   const deleteTask = async (taskId: string) => {
     if (!confirm('Supprimer cette tâche ?')) return;
 
-    // Update optimiste
     setTasks(tasks.filter(t => t.id !== taskId));
 
     const { error } = await supabase
@@ -112,35 +121,49 @@ export default function PlanningScreen() {
 
     if (error) {
       console.error('Error deleting task:', error);
-      loadTasks(); // Rollback
+      loadTasks(currentDate);
     }
   };
 
-  // Grouper les tâches par bloc horaire
+  // ✅ FIX 3 : Logique de tri par blocs horaires corrigée
+  // Matin : 6h–11h59
   const morningTasks = tasks.filter(t => {
-    const hour = parseInt(t.time?.split('h')[0] || '0');
+    if (!t.time) return false;
+    const hour = parseInt(t.time.split('h')[0]);
     return hour >= 6 && hour < 12;
   });
 
+  // Midi : 12h–13h59
+  const noonTasks = tasks.filter(t => {
+    if (!t.time) return false;
+    const hour = parseInt(t.time.split('h')[0]);
+    return hour >= 12 && hour < 14;
+  });
+
+  // Après-midi : 14h–17h59
   const afternoonTasks = tasks.filter(t => {
-    const hour = parseInt(t.time?.split('h')[0] || '0');
-    return hour >= 12 && hour < 18;
+    if (!t.time) return false;
+    const hour = parseInt(t.time.split('h')[0]);
+    return hour >= 14 && hour < 18;
   });
 
+  // Soir : 18h–23h59
   const eveningTasks = tasks.filter(t => {
-    const hour = parseInt(t.time?.split('h')[0] || '0');
-    return hour >= 18 && hour < 23;
+    if (!t.time) return false;
+    const hour = parseInt(t.time.split('h')[0]);
+    return hour >= 18 && hour <= 23;
   });
 
-  const otherTasks = tasks.filter(t => !t.time);
+  // ✅ FIX 3 : Tâches sans heure dans un bloc dédié "À faire"
+  const unscheduledTasks = tasks.filter(t => !t.time || t.time.trim() === '');
 
   // Couleurs de priorité
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'haute': return '#EF4444'; // Rouge
-      case 'moyenne': return '#F59E0B'; // Orange
-      case 'basse': return '#10B981'; // Vert
-      default: return '#64748B'; // Gris
+      case 'haute': return '#EF4444';
+      case 'moyenne': return '#F59E0B';
+      case 'basse': return '#10B981';
+      default: return '#64748B';
     }
   };
 
@@ -160,14 +183,26 @@ export default function PlanningScreen() {
   const formatDate = (date: Date) => {
     const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    
+
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    if (isToday) return `Aujourd'hui • ${date.getDate()} ${months[date.getMonth()]}`;
+    if (isTomorrow) return `Demain • ${date.getDate()} ${months[date.getMonth()]}`;
+    if (isYesterday) return `Hier • ${date.getDate()} ${months[date.getMonth()]}`;
     return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
   // Composant TaskItem
   const TaskItem = ({ task }: { task: Task }) => {
     const priorityColor = getPriorityColor(task.priority);
-    
+
     return (
       <div className="flex items-center gap-3 p-3 bg-[#0F172A] rounded-xl group">
         <button
@@ -183,8 +218,7 @@ export default function PlanningScreen() {
           )}
         </button>
 
-        {/* Barre de priorité */}
-        <div 
+        <div
           className="w-1 h-8 rounded-full flex-shrink-0"
           style={{ backgroundColor: priorityColor }}
         />
@@ -194,12 +228,14 @@ export default function PlanningScreen() {
             {task.title}
           </p>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-[#64748B]">{task.time} • {task.tag}</p>
-            <span 
+            <p className="text-xs text-[#64748B]">
+              {task.time ? `${task.time} • ` : ''}{task.tag}
+            </p>
+            <span
               className="px-2 py-0.5 rounded text-[10px] font-semibold"
-              style={{ 
+              style={{
                 backgroundColor: `${priorityColor}20`,
-                color: priorityColor
+                color: priorityColor,
               }}
             >
               {task.priority === 'haute' ? 'Haute' : task.priority === 'moyenne' ? 'Moyenne' : 'Basse'}
@@ -207,7 +243,6 @@ export default function PlanningScreen() {
           </div>
         </div>
 
-        {/* Bouton supprimer */}
         <button
           onClick={() => deleteTask(task.id)}
           className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-[#EF4444]/10 rounded-lg"
@@ -218,19 +253,41 @@ export default function PlanningScreen() {
     );
   };
 
+  // Bloc horaire générique
+  const TimeBlock = ({ title, blockTasks }: { title: string; blockTasks: Task[] }) => (
+    <div className="bg-[#1E293B] rounded-2xl p-5 border border-[#334155]">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-semibold text-[#F8FAFC]">{title}</h3>
+        <button
+          onClick={() => setModalOpen(true)}
+          className="w-8 h-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center hover:bg-[#22D3EE]/20 transition-colors"
+        >
+          <Plus size={16} className="text-[#22D3EE]" />
+        </button>
+      </div>
+      <div className="space-y-2">
+        {blockTasks.length === 0 ? (
+          <p className="text-sm text-[#64748B] text-center py-4">Aucune tâche</p>
+        ) : (
+          blockTasks.map((task) => <TaskItem key={task.id} task={task} />)
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#0F172A] pb-24">
       <div className="max-w-3xl mx-auto px-6 py-8">
-        
+
         {/* HEADER */}
         <div className="mb-8">
           <h1 className="text-[32px] font-bold text-[#F8FAFC] mb-6">
             Planning
           </h1>
 
-          {/* Date Selector */}
+          {/* ✅ FIX 2 : Sélecteur de date avec label "Aujourd'hui / Demain / Hier" */}
           <div className="flex items-center justify-between bg-[#1E293B] rounded-2xl p-4 border border-[#334155]">
-            <button 
+            <button
               onClick={goToPreviousDay}
               className="w-10 h-10 rounded-lg bg-[#0F172A] border border-[#334155] flex items-center justify-center hover:border-[#22D3EE]/50 transition-colors"
             >
@@ -239,7 +296,7 @@ export default function PlanningScreen() {
             <span className="text-lg font-semibold text-[#F8FAFC]">
               {formatDate(currentDate)}
             </span>
-            <button 
+            <button
               onClick={goToNextDay}
               className="w-10 h-10 rounded-lg bg-[#0F172A] border border-[#334155] flex items-center justify-center hover:border-[#22D3EE]/50 transition-colors"
             >
@@ -255,93 +312,19 @@ export default function PlanningScreen() {
           </div>
         )}
 
-        {/* BLOCS HORAIRES */}
+        {/* ✅ FIX 2 & 3 : Blocs horaires correctement filtrés */}
         {!loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* MATIN */}
-            <div className="bg-[#1E293B] rounded-2xl p-5 border border-[#334155]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-[#F8FAFC]">Matin</h3>
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="w-8 h-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center hover:bg-[#22D3EE]/20 transition-colors"
-                >
-                  <Plus size={16} className="text-[#22D3EE]" />
-                </button>
+            <TimeBlock title="Matin" blockTasks={morningTasks} />
+            <TimeBlock title="Midi" blockTasks={noonTasks} />
+            <TimeBlock title="Après-midi" blockTasks={afternoonTasks} />
+            <TimeBlock title="Soir" blockTasks={eveningTasks} />
+            {/* ✅ FIX 3 : Bloc dédié aux tâches sans heure */}
+            {unscheduledTasks.length > 0 && (
+              <div className="md:col-span-2">
+                <TimeBlock title="À faire (sans horaire)" blockTasks={unscheduledTasks} />
               </div>
-
-              <div className="space-y-2">
-                {morningTasks.length === 0 ? (
-                  <p className="text-sm text-[#64748B] text-center py-4">Aucune tâche</p>
-                ) : (
-                  morningTasks.map((task) => <TaskItem key={task.id} task={task} />)
-                )}
-              </div>
-            </div>
-
-            {/* MIDI */}
-            <div className="bg-[#1E293B] rounded-2xl p-5 border border-[#334155]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-[#F8FAFC]">Midi</h3>
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="w-8 h-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center hover:bg-[#22D3EE]/20 transition-colors"
-                >
-                  <Plus size={16} className="text-[#22D3EE]" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {afternoonTasks.length === 0 ? (
-                  <p className="text-sm text-[#64748B] text-center py-4">Aucune tâche</p>
-                ) : (
-                  afternoonTasks.map((task) => <TaskItem key={task.id} task={task} />)
-                )}
-              </div>
-            </div>
-
-            {/* APRÈS-MIDI */}
-            <div className="bg-[#1E293B] rounded-2xl p-5 border border-[#334155]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-[#F8FAFC]">Après-midi</h3>
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="w-8 h-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center hover:bg-[#22D3EE]/20 transition-colors"
-                >
-                  <Plus size={16} className="text-[#22D3EE]" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {eveningTasks.length === 0 ? (
-                  <p className="text-sm text-[#64748B] text-center py-4">Aucune tâche</p>
-                ) : (
-                  eveningTasks.map((task) => <TaskItem key={task.id} task={task} />)
-                )}
-              </div>
-            </div>
-
-            {/* SOIR */}
-            <div className="bg-[#1E293B] rounded-2xl p-5 border border-[#334155]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-[#F8FAFC]">Soir</h3>
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="w-8 h-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center hover:bg-[#22D3EE]/20 transition-colors"
-                >
-                  <Plus size={16} className="text-[#22D3EE]" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {otherTasks.length === 0 ? (
-                  <p className="text-sm text-[#64748B] text-center py-4">Aucune tâche</p>
-                ) : (
-                  otherTasks.map((task) => <TaskItem key={task.id} task={task} />)
-                )}
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -401,10 +384,12 @@ export default function PlanningScreen() {
 
       {/* MODALS */}
       <MenuPlus isOpen={menuPlusOpen} onClose={() => setMenuPlusOpen(false)} />
-      <ModalNouvelleTache 
-        isOpen={modalOpen} 
+      <ModalNouvelleTache
+        isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSubmit={handleTaskAdded}
+        // ✅ FIX 2 : Passer la date sélectionnée au modal pour pré-remplir
+        defaultDate={getDateISO(currentDate)}
       />
     </div>
   );
