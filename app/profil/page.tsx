@@ -56,7 +56,7 @@ export default function ProfilScreen() {
   const settingsItems = [
     { id: 'profil', icon: UserCircle, label: 'Modifier mon profil', onClick: () => router.push('/modifier-profil') },
     { id: 'parametres', icon: Settings, label: 'Paramètres', onClick: () => router.push('/parametres') },
-    { id: 'notifications', icon: Bell, label: 'Notifications', onClick: () => console.log('/notifications') },
+    { id: 'notifications', icon: Bell, label: 'Notifications', onClick: () => console.log('/parametres/notifications') },
     { id: 'theme', icon: Palette, label: 'Thème', badge: 'Sombre', onClick: () => console.log('Thème') },
     { id: 'about', icon: Info, label: 'À propos', onClick: () => console.log('À propos') },
   ];
