@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Home, Calendar, DollarSign, 
-  ChevronRight, UserCircle, Bell, Palette, Info, LogOut, MoreHorizontal
+  ChevronRight, UserCircle, Bell, Palette, Info, LogOut, MoreHorizontal,
+  Settings
 } from 'lucide-react';
 import { MenuPlus } from '../../src/components/MenuPlus';
 import { supabase } from '@/src/lib/supabase';
@@ -53,8 +54,9 @@ export default function ProfilScreen() {
   };
 
   const settingsItems = [
-    { id: 'profil', icon: UserCircle, label: 'Modifier mon profil', onClick: () => router.push('/parametres') },
-    { id: 'notifications', icon: Bell, label: 'Notifications', onClick: () => console.log('Notifications') },
+    { id: 'profil', icon: UserCircle, label: 'Modifier mon profil', onClick: () => router.push('/modifier-profil') },
+    { id: 'parametres', icon: Settings, label: 'Paramètres', onClick: () => router.push('/parametres') },
+    { id: 'notifications', icon: Bell, label: 'Notifications', onClick: () => console.log('/notifications') },
     { id: 'theme', icon: Palette, label: 'Thème', badge: 'Sombre', onClick: () => console.log('Thème') },
     { id: 'about', icon: Info, label: 'À propos', onClick: () => console.log('À propos') },
   ];

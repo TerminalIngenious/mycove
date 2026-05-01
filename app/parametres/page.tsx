@@ -45,7 +45,7 @@ export default function ParametresScreen() {
           icon: Bell,
           label: 'Notifications',
           description: 'Gérer les alertes et rappels',
-          onClick: () => console.log('Notifications'),
+          onClick: () => console.log('notifications'),
         },
         {
           id: 'theme',
