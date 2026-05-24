@@ -45,7 +45,7 @@ export default function ParametresScreen() {
           icon: Bell,
           label: 'Notifications',
           description: 'Gérer les alertes et rappels',
-          onClick: () => console.log('notifications'),
+          onClick: () => router.push('/notifications'),
         },
         {
           id: 'theme',
@@ -53,7 +53,7 @@ export default function ParametresScreen() {
           label: 'Thème',
           description: 'Apparence de l\'application',
           badge: 'Sombre',
-          onClick: () => console.log('Thème'),
+          onClick: () => router.push('/theme'),
         },
         {
           id: 'langue',
@@ -61,7 +61,7 @@ export default function ParametresScreen() {
           label: 'Langue',
           description: 'Langue de l\'interface',
           badge: 'Français',
-          onClick: () => console.log('Langue'),
+          onClick: () => router.push('/langue'),
         },
       ],
     },
@@ -73,7 +73,7 @@ export default function ParametresScreen() {
           icon: Database,
           label: 'Gestion des données',
           description: 'Exporter, sauvegarder, supprimer',
-          onClick: () => console.log('Données'),
+          onClick: () => router.push('/donnees'),
         },
         {
           id: 'confidentialite',
@@ -185,7 +185,7 @@ export default function ParametresScreen() {
       </div>
 
       {/* BOTTOM NAVIGATION */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#1E293B] border-t border-[#334155]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1E293B] border-t border-[#334155]">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-around">
           <button
             onClick={() => handleNavigation('dashboard')}
